@@ -1,100 +1,112 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { TodoEntity } from './entities/todo.entity';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreateTodoDto } from './dto/create-todo.dto';
-import { UpdateTodoDto } from './dto/update-todo.dto';
 
 export interface ITodo {
-  id?: string;
-  title: string;
+  id: number;
+  name: string;
   status: TodoStatus;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export enum TodoStatus {
+  ALL = '',
   PENDING = 'pending',
   PROGRESS = 'progress',
   DONE = 'done',
 }
 
-export const todos: Array<ITodo> = [
-  {
-    id: '1',
-    title: 'New Task',
-    status: TodoStatus.PENDING,
-  },
-  {
-    id: '2',
-    title: 'In Progress Task',
-    status: TodoStatus.PROGRESS,
-  },
-  {
-    id: '3',
-    title: 'Done Task',
-    status: TodoStatus.DONE,
-  },
-];
-
 @Injectable()
 export class TodoService {
-  create(createTodoDto: CreateTodoDto): ITodo {
-    let todo = todos.find((todo) => todo.title === createTodoDto.title);
-    if (todo) throw new ConflictException();
-    todo = {
-      id: `${new Date()}${todos.length + 1}`,
-      title: createTodoDto.title,
-      status: TodoStatus.PENDING,
-    };
-    todos.push(todo);
+  constructor(
+    @InjectRepository(TodoEntity)
+    private todoRepository: Repository<TodoEntity>,
+  ) {}
+
+  async create(createTodoDto: CreateTodoDto) {
+    const todo = this.todoRepository.create({
+      name: createTodoDto.name,
+      start_date: createTodoDto.start_date,
+      end_date: createTodoDto.end_date,
+    });
+    await this.todoRepository.save(todo);
     return todo;
   }
 
-  findAll(): Array<ITodo> {
-    return todos;
-  }
-
-  search(name: string) {
-    const searchTodo = todos;
-    return searchTodo.filter((todo) =>
-      todo.title.toLowerCase().includes(name.toLowerCase()),
-    );
-  }
-
-  filter(status?: TodoStatus) {
-    if (status) {
-      const filter = todos;
-      return filter.filter((todo) => todo.status === status);
-    }
-    return todos;
-  }
-
-  findOne(id: string): ITodo {
-    const todo = todos.find((todo) => todo.id === id);
-    if (todo) throw new ConflictException();
-    return todo;
-  }
-
-  markInProgress(id: string) {
-    const pos = todos.findIndex((todo) => todo.id === id);
-    console.log(pos);
-    if (pos > -1) {
-      todos[pos].status = TodoStatus.PROGRESS;
-    }
-  }
-
-  markAsDone(id: string) {
-    const pos = todos.findIndex((todo) => todo.id === id);
-    console.log(pos);
-    if (pos > -1) {
-      todos[pos].status = TodoStatus.DONE;
+  async findAll(
+    page?: number,
+    size?: number,
+    status?: TodoStatus,
+    name?: string,
+  ): Promise<{ page: number; size: number; data: Array<ITodo> }> {
+    try {
+      let todos: Array<ITodo>;
+      const builder = this.todoRepository.createQueryBuilder('todo_entity');
+      if (status) {
+        builder.skip(page).take(size).where('todo_entity.status = :status', {
+          status: status,
+        });
+        todos = await builder.getMany();
+      } else if (name) {
+        builder
+          .skip(page)
+          .take(size)
+          .where('LOWER(todo_entity.name) LIKE LOWER(:name)', {
+            name: `%${name}%`,
+          });
+        todos = await builder.getMany();
+        console.log(todos);
+      } else {
+        builder.skip(page).take(size);
+        todos = await builder.getMany();
+      }
+      return {
+        page: page ?? 0,
+        size: size ?? 20,
+        data: todos,
+      };
+    } catch (error) {
+      throw new InternalServerErrorException();
     }
   }
 
-  update(updateTodoDto: UpdateTodoDto) {
-    return `This action updates a todo`;
+  async filter(status?: TodoStatus) {
+    return await this.todoRepository.find({ where: { status } });
   }
 
-  remove(id: string) {
-    const pos = todos.findIndex((value) => value.id === id);
-    if (pos > -1) {
-      todos.splice(pos, 1);
+  // findOne(id: string): ITodo {
+  //   const todo = todos.find((todo) => todo.id === id);
+  //   if (todo) throw new ConflictException();
+  //   return todo;
+  // }
+
+  async markInProgress(id: number) {
+    const todo = await this.todoRepository.findOneBy({ id });
+    if (todo) {
+      (todo.status = TodoStatus.PROGRESS), await this.todoRepository.save(todo);
+    }
+  }
+
+  async markAsDone(id: number) {
+    const todo = await this.todoRepository.findOneBy({ id });
+    if (todo) {
+      (todo.status = TodoStatus.DONE), await this.todoRepository.save(todo);
+    }
+  }
+
+  // update(updateTodoDto: UpdateTodoDto) {
+  //   return `This action updates a todo`;
+  // }
+
+  async remove(id: number) {
+    const todo = await this.todoRepository.findOneBy({ id });
+    if (todo) {
+      (todo.status = TodoStatus.DONE), await this.todoRepository.remove(todo);
     }
   }
 }
