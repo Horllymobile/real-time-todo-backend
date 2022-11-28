@@ -6,10 +6,10 @@ import { TodoModule } from './todo/todo.module';
   imports: [
     TypeOrmModule.forRoot({
       type: 'sqlite',
-      database: 'todo-database.sqlite3',
+      database: 'database.sqlite3',
       synchronize: true,
       autoLoadEntities: true,
-      logger: 'simple-console',
+      logger: 'file',
       logging: true,
     }),
     TodoModule,
