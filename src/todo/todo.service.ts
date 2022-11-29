@@ -1,5 +1,9 @@
 import { TodoEntity } from './entities/todo.entity';
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateTodoDto } from './dto/create-todo.dto';
@@ -75,33 +79,23 @@ export class TodoService {
     }
   }
 
+  async findOne(id: number): Promise<ITodo> {
+    const todo = await this.todoRepository.findOne({ where: { id } });
+    if (!todo) throw new NotFoundException();
+    return todo;
+  }
+
   async filter(status?: TodoStatus) {
     return await this.todoRepository.find({ where: { status } });
   }
 
-  // findOne(id: string): ITodo {
-  //   const todo = todos.find((todo) => todo.id === id);
-  //   if (todo) throw new ConflictException();
-  //   return todo;
-  // }
-
-  async markInProgress(id: number) {
+  async updateStatus(id: number, status: TodoStatus) {
     const todo = await this.todoRepository.findOneBy({ id });
     if (todo) {
-      (todo.status = TodoStatus.PROGRESS), await this.todoRepository.save(todo);
+      todo.status = status;
+      await this.todoRepository.save(todo);
     }
   }
-
-  async markAsDone(id: number) {
-    const todo = await this.todoRepository.findOneBy({ id });
-    if (todo) {
-      (todo.status = TodoStatus.DONE), await this.todoRepository.save(todo);
-    }
-  }
-
-  // update(updateTodoDto: UpdateTodoDto) {
-  //   return `This action updates a todo`;
-  // }
 
   async remove(id: number) {
     const todo = await this.todoRepository.findOneBy({ id });

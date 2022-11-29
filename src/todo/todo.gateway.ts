@@ -60,27 +60,24 @@ export class TodoGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
-  // @SubscribeMessage('findOneTodo')
-  // findOne(@MessageBody() id: string): ITodo {
-  //   return this.todoService.findOne(id);
-  // }
+  @SubscribeMessage('findOneTodo')
+  async findOne(@MessageBody() id: number) {
+    this.server.emit('findOneTodo', await this.todoService.findOne(id));
+  }
 
   @SubscribeMessage('markInProgress')
-  async markInProgress(@MessageBody() id: number) {
-    await this.todoService.markInProgress(id);
+  async markInProgress(
+    @MessageBody() payload: { id: number; status: TodoStatus },
+  ) {
+    await this.todoService.updateStatus(payload.id, payload.status);
     this.server.emit('findAllTodo', await this.todoService.findAll(0, 20));
   }
 
   @SubscribeMessage('markAsDone')
-  async markAsDone(@MessageBody() id: number) {
-    await this.todoService.markAsDone(id);
+  async markAsDone(@MessageBody() payload: { id: number; status: TodoStatus }) {
+    await this.todoService.updateStatus(payload.id, payload.status);
     this.server.emit('findAllTodo', await this.todoService.findAll(0, 20));
   }
-
-  // @SubscribeMessage('updateTodo')
-  // update(@MessageBody() updateTodoDto: UpdateTodoDto) {
-  //   return this.todoService.update(updateTodoDto);
-  // }
 
   @SubscribeMessage('deleteTodo')
   async remove(@MessageBody() id: number) {
